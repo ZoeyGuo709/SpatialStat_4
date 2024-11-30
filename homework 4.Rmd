@@ -1,0 +1,313 @@
+---
+title: "Homework 4"
+author: "gzy"
+date: "2024-11-29"
+output: html_document
+---
+
+# 1. Introduction:
+1 paragraph introduction to the problem, which describes the importance of the issue, and briefly states what you will be doing in this report.
+
+# 2. Methodology:
+
+## 2.1 What hypotheses you will be testing
+
+i.	What is CSR? Describe the conditions that need to hold in order for the point pattern to be completely spatially random.
+ii.	What are your null/alternative hypotheses in point pattern analyses? 
+
+## 2.2 The Quadrat method 
+
+i.	What does this method entail? That is, describe the method and be sure to write about it in your own words.
+ii.	Discuss the limitations of the Quadrat method and why it’s generally not used in practice.
+
+```{r setup}
+
+knitr::opts_chunk$set(echo = FALSE)
+options(scipen=999)
+#https://www.e-education.psu.edu/geog586/l5_p9.html
+
+install.packages("sp")
+install.packages("ISLR")
+install.packages("MASS")
+install.packages("spatstat")
+install.packages("spatial")
+install.packages("maptools")
+install.packages("ppp")
+install.packages("fossil")
+install.packages("adehabitatHR")
+install.packages("gdata")
+install.packages("raster")
+install.packages("rgdal")
+install.packages("geostatsp")
+install.packages("spatialEco")
+install.packages("spatstat.core")
+
+#Install SpatStat
+install.packages("D:/SpatialStat/HW 4/Package/spatstat.explore_3.3-3.tar.gz", repos = NULL)
+
+#Install SpatStat
+install.packages("D:/SpatialStat/HW 4/Package/maptools_1.1-6.tar.gz", repos = NULL)
+```
+
+```{r}
+library(graphics)
+library(maptools)
+library(spatstat)
+library(sp)
+library(fossil)
+library(spatial)
+library(adehabitatHR)
+library(gdata)
+library(raster)
+library(rgdal)
+library(geostatsp)
+library(spatialEco)
+library(spatstat.core)
+```
+```{r}
+#Setting working directory
+setwd("D:/SpatialStat/K-Function/0. Quadrat Analysis Data/Quadrat Analysis Data")
+
+#Reading Polygon Boundary.shp from the directory above
+Boundary <- rgdal::readOGR(dsn = "D:/SpatialStat/K-Function/0. Quadrat Analysis Data/Quadrat Analysis Data", layer = "Boundary")
+
+
+#Class "SpatialPolygons" holds polygon topology (without attributes)
+BoundaryPolygons <- as(Boundary, "SpatialPolygons")
+
+#The class "owin" is a way of specifying the observation window for a point pattern.
+BoundaryPolygonsOW<- as(BoundaryPolygons, "owin")
+
+#Plotting the Boundary Window
+plot(BoundaryPolygonsOW, main=NULL)
+title(main = "Point Pattern Analysis")
+```
+```{r}
+#Reading in the file with the points
+Pts <- read.table("Quadrat Points.txt", header=T, sep="\t", colClasses = c("X"="double"))
+#Very roughly speaking, using attach() in R is like relying on the implicit use of the 
+#most recent data set. 
+#http://www.r-bloggers.com/to-attach-or-not-attach-that-is-the-question/
+#Only attach file once. If you do it more than once, use detach(Pts) command 1+ times
+#to detach file
+#attach(Pts)
+#detach(Pts)
+pp <- ppp(Pts$X, Pts$Y, window=BoundaryPolygonsOW)
+#If the following error message is received: data contain duplicated points
+#Use the command duplicated(X,Y) to see which points are duplicates.
+#The command cbind(Pts,duplicated(X,Y)) will show you which points have duplicated values
+#In general, unless you know that the duplicates shouldn't be there, you would ignore
+#this warning.
+
+#Now let's plot the points and the Boundary.
+plot(pp, main=NULL)
+title(main = "Point Pattern Analysis")
+```
+
+```{r}
+#First let's create a matrix that only includes the x & y coordinates of each point.
+#This is simply the last two columns of matrix Pts.
+xy <-Pts[,2:3]
+
+#In order for R to consider xy a spatial object, we need to convert it to 
+#class SpatialPoints. We do it like this:
+xysp <-SpatialPoints(xy)
+
+#Now, let's use the mcp (minimum convex polygon) function to generate the mcp and
+#plot the points with the mcp
+#If we wanted to exclude some outlier points (e.g., 5 of the 100 points in the data)
+#we would specify a different percent value below (e.g., 95 instead of 100)
+cp <- mcp(xysp, percent=100)
+
+#The class "owin" is a way of specifying the observation window for a point pattern.
+cpnew <- as(cp, "owin")
+
+#Here, we are using the attached dataset Pts to plot X and Y coordinates within the
+#window cpnew.
+mcpoly <- ppp(Pts$X,Pts$Y, window=cpnew)
+plot(mcpoly, main=NULL)
+
+
+#A few pretty cool things we can do with the data:
+#1. Generate the kernel density map of the points
+plot(density(pp))
+#2. Generate the countour map. The add=TRUE (or add=T) is a way for R to know that
+#you want the new plot to be added onto the existing plot.
+contour(density(pp), add=TRUE)
+#3. Add points on top of the maps
+plot(pp, add=T)
+
+```
+
+
+## 2.3 The Nearest Neighbor Analysis method
+i.	What does this method entail?  That is, describe the method and be sure to write about it in your own words. Be sure to specify the study area you are using here.
+ii.	What statistical test will you use here? What is the test statistic? That is, how do you determine whether you have significant clustering or dispersion (uniformity)? Include the relevant formulas and be sure to describe them and all the terms that they include.
+iii.	What are the limitations of the Nearest Neighbor Analysis? In particular, compare the problem at hand with the hospital example in the slides.
+```{r}
+#NEAREST NEIGHBOR ANALYSIS
+#Now let's try some Nearest Neighbor Analysis!
+dev.off() 
+#Computes the distance from each point to its nearest neighbour in a point pattern.
+nnd <- nndist.ppp(pp)
+#Using the formulas on the slides, we calculate Mean Observed Distance,
+#Mean Expected Distance and the Standard Error.
+MeanObsDist <- mean(nnd)
+#The area.owin command calculates the area of the study area that you use.
+#Here it's the minimum enclosing rectangle, but it doesn't have to be - it 
+#could be any shapefile you import from ArcGIS (or generate in R) that 
+#corresponds to the study area.
+MeanExpDist <- 0.5 / sqrt(nrow(Pts) / area.owin(BoundaryPolygonsOW))
+SE <- 0.26136 / sqrt(nrow(Pts)*nrow(Pts) / area.owin(BoundaryPolygonsOW))
+#Calculating the z-score
+zscore <- (MeanObsDist - MeanExpDist)/SE
+#Statistical test
+#Here, if the z score is positive, we do an upper-tailed test and if the 
+#z score is negative we do a lower-tailed test to come up with the p-value.
+pval<-ifelse(zscore > 0, 1 - pnorm(zscore), pnorm(zscore))
+#Calculating the NNI
+NNI <- MeanObsDist / MeanExpDist
+pval
+NNI
+```
+
+```{r}
+#spatialEco package has an nni function which unfortunately doesn't take 
+#user-defined study area files
+xy <- Pts[,c(2,3)]      
+sp.Pts <- SpatialPointsDataFrame(coords=xy, data=Pts)   #Convert our data to a sp object
+spatialEco::nni(sp.Pts,win="hull")      #Results are still pretty similar to results above
+
+```
+
+
+## 2.4 K-Functions Analysis method
+i.	What does the method entail? That is, describe the method and be sure to write about it in your own words.
+1.	Be sure to include what K(d) and L(d) functions are in this description, and how they are defined in the software package that you use.
+ii.	Talk about the beginning and incremental distances, and specify how they are calculated.
+iii.	Describe the testing procedure and the concept of confidence envelopes. 
+iv.	What happens to points next to the border? Talk about Ripley’s Edge Correction and the Simulate Outer Boundary Values Edge Correction (and specify which one you use and why).
+v.	Talk about the nonhomogeneous K-Functions – that is, situations when you need to take into account a reference measure such as population in your K-function analysis. 
+1.	Briefly describe when/where this would be appropriate
+2.	In your own words, describe how this may be done
+a.	Hint: this is what is done in the last 25 or so slides.
+
+```{r}
+#K-FUNCTIONS
+#What about K-functions? Of course we'll do K-functions as well!
+#Setting working directory
+setwd("C:/Users/Administrator/Dropbox/Documents/Work and School/Teaching/CPLN 671 - Statistics and Data Mining/Point Pattern Analysis/Data/K-Functions Taking Population Into Consideration")
+
+#Reading Polygon Boundary.shp from the directory above
+Boundary <- readOGR('.', 'PA_Albers')
+
+#Class "SpatialPolygons" holds polygon topology (without attributes)
+BoundaryPolygons <- as(Boundary, "SpatialPolygons")
+
+#The class "owin" is a way of specifying the observation window for a point pattern.
+BoundaryPolygonsOW<- as(BoundaryPolygons, "owin")
+
+#Plotting the Boundary Window
+#plot(r)
+plot(BoundaryPolygonsOW, main="Point Pattern Analysis with K-Functions")#,add=T)
+
+#Reading in the file with the points
+Pts <- read.table("Hospitals_for_R.txt", header=T, sep="\t", colClasses = c("X"="double"))
+#Very roughly speaking, using attach() in R is like relying on the implicit use of the 
+#most recent data set. 
+#http://www.r-bloggers.com/to-attach-or-not-attach-that-is-the-question/
+#Only attach file once. If you do it more than once, use detach(Pts) command 1+ times
+#to detach file
+#attach(Pts)
+#detach(Pts)
+pp <- ppp(Pts$X, Pts$Y, window=BoundaryPolygonsOW)
+#If the following error message is received: data contain duplicated points
+#Use the command duplicated(X,Y) to see which points are duplicates.
+#The command cbind(Pts,duplicated(X,Y)) will show you which points have duplicated values
+#In general, unless you know that the duplicates shouldn't be there, you would ignore
+#this warning.
+
+#Now let's plot the points and the Boundary.
+plot(pp,add=T)
+
+```
+
+```{r}
+#http://www.math.umt.edu/graham/stat544/ripleys.pdf
+#If we double click on the khat data set on the right, it will have 513 observations
+#and 5 variables. We are interested in 2 of the variables: 
+#-- r, which is the distance that goes in increments of 138.8693
+#-- iso, which is the k-function calculated with Ripley's edge correction
+#K-Functions
+khat <-Kest(pp, rmax=250000) #,correction="Ripley")
+#Plots Ripley's K function calculated with Ripley's isotropic edge correction, with
+#line width 2, axis labels, and a main title.
+plot(khat$r,khat$iso,xlab="r", ylab="Ripley's K",
+     main="Ripley's Estimated K-Function",
+     cex.lab=1.6,cex.axis=1.5,cex.main=1.5,lty=1,lwd=2)
+# Overlays the theoretical K-function under CSR with a dashed (lty=8) line.
+lines(khat$r,khat$theo,lty=8, lwd=2) 
+#Code to compute the Ripley's Simulation Confidence Envelopes
+#Computes confidence envelopes using n=199 simulations. Here, nrank=1 means we're
+#looking at the lowest and highest values of the simulated envelopes. Here,
+#alpha = 2 * nrank/(1 + nsim) = 2*1/200 = 0.01
+#spatstat::envelope is to specify that the envelope command is in the spatstat 
+#library and not the boot library.
+Kenv <- spatstat.core::envelope(pp,fun="Kest", rmax=250000, nsim=9, nrank=1) 
+# Plots Ripley's K function with 99% simulation # envelopes, axis labels, and a title.
+plot(Kenv,xlab="r",ylab="Khat(r)", cex.lab=1.6,cex.axis=1.5,main= 
+       "Ripley's Khat with Confidence Envelopes",cex.main=1.5,lwd=2)
+```
+
+```{r}
+#L-Functions
+#Computes Ripley's L* for each sample event
+lhat <- Lest(pp, rmax=250000) 
+#Plots Ripley's L function calculated with line width 2, 
+#Ripley's isotropic edge correction, with axis labels, and a main title.
+plot(lhat$r,lhat$iso-lhat$r, xlab="r",ylab="Ripley's L",cex.lab=1.6,  
+     cex.axis=1.5,cex.main=1.5,lty=1,lwd=2, main="Ripley's Estimated L-Function") 
+#Overlays the theoretical L-function under CSR with a dashed (lty=8) line.
+lines(lhat$r,lhat$theo-lhat$r,lty=8,lwd=2) 
+
+#Code to compute the Ripley's Simulation Confidence Envelopes
+#Computes confidence envelopes using n=199 simulations. Here, nrank=1 means we're
+#looking at the lowest and highest values of the simulated envelopes. Here,
+#alpha = 2 * nrank/(1 + nsim) = 2*1/200 = 0.01
+Lenv <- spatstat.core::envelope(pp,fun="Lest", rmax=250000, nsim=9,nrank=1)
+# Plots Ripley's L function with 99% simulation envelopes, axis labels, and a title.
+plot(Lenv,xlab="r",ylab="Lhat(r)", cex.lab=1.6,cex.axis=1.5,
+     main= "Ripley's Lhat with Confidence Envelopes",cex.main=1.5,lwd=2,legend=F)
+#A better way to view this is to rotate this plot 45 degrees clockwise.
+#Gives the Ripley's data frame a new name L2.
+L2 <- Lenv 
+#Now we will subtract the distance r from the R-defined Ripley's L's
+#(This will be done for the observed L, theoretical L, lower and uper envelopes)
+L2$obs <- L2$obs-L2$r
+L2$theo <- L2$theo-L2$r
+L2$lo <- L2$lo-L2$r
+L2$hi <- L2$hi-L2$r
+# Plots Ripley's L function with 99% simulation envelopes, axis labels, and a title.
+plot(L2,xlab="r",ylab="Lhat(r)", cex.lab=1.6,cex.axis=1.5,
+     main= "Ripley's Lhat with Confidence Envelopes",cex.main=1.5,lwd=2,legend=F)
+```
+
+
+# 3. Results
+
+## 3.1 Present results of the Nearest Neighbor Analysis
+i.	Describe the results. Do you reject the null hypothesis? 
+
+## 3.2 Present results of the K-function Analysis
+i.	Describe the results, and be sure to specify what the beginning and incremental distances were, and why you set them at those levels.
+1.	Do you reject the null hypothesis? At what distances?
+ii.	Without actually doing the analyses, do you expect that the reason for not seeing any farmers markets in Northeast Philly and certain parts of North and South Philly is that the population in that part of the city is too low? That is, do you expect that you would get different results if you were to take population (say, at the zip code level) into consideration?
+
+
+# 4. Discussion
+a.	Are the results obtained with the Nearest Neighbor Analysis and K-function Analysis consistent with each other?
+b.	Are they consistent with your expectations, based on the visual examination of the point data, and given the limitations of each method?
+c.	Does it seem to be the case that areas with lower median incomes have fewer farmers markets? Without doing any statistical tests, present a map of the farmers markets overlaid on a map of median household income at the zip code level and discuss. The Philadelphia_ZipCodes shapefile has the MedIncome variable which is the median household income for the year 2000.
+d.	What conclusions can you make based on these findings? That is, can you conclude that farmers markets are clustered in Philly? 
+e.	What might the policy implications of these findings be?
+
