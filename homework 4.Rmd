@@ -6,14 +6,25 @@ output: html_document
 ---
 
 # 1. Introduction:
-1 paragraph introduction to the problem, which describes the importance of the issue, and briefly states what you will be doing in this report.
+*1 paragraph introduction to the problem, which describes the importance of the issue, and briefly states what you will be doing in this report.*
+Access to fresh and healthy food is a pressing issue in many American cities, leading to significant public health challenges and exacerbating food access inequities, particularly in underserved communities. In Philadelphia, the Food Trust has established farmers' markets across the city as a strategy to provide residents with fresh, nutritious food. However, some neighborhoods still face limited or no access to these markets, raising concerns about the equitable distribution of this vital resource. This report examines the spatial distribution of farmers' markets in Philadelphia using point pattern analysis to determine whether they are randomly placed, clustered, or dispersed, and to identify areas lacking access to these essential food sources.
 
 # 2. Methodology:
 
 ## 2.1 What hypotheses you will be testing
 
-i.	What is CSR? Describe the conditions that need to hold in order for the point pattern to be completely spatially random.
-ii.	What are your null/alternative hypotheses in point pattern analyses? 
+*i.	What is CSR? Describe the conditions that need to hold in order for the point pattern to be completely spatially random.*
+A point pattern is considered **Completely Spatially Random (CSR)** if the points within a defined area are distributed without any discernible pattern, and their placement is entirely random. CSR serves as a baseline model in spatial analysis, helping researchers determine whether a distribution is random, clustered, or dispersed. It is often used as a null hypothesis in point pattern analysis to assess deviations in spatial arrangements.
+
+To establish that a point pattern is CSR, two critical conditions must be met. First, the probability of a point landing in any location within the study area must be directly proportional to the size of that location. If the area is divided into equal-sized cells, each cell should have an equal likelihood of containing a point. For example, if a region is divided into 54 cells of equal area, the probability of a point being in any cell would be uniform, with each cell having a likelihood of \(1/54\).
+
+Second, the placement of one point must be entirely independent of the placement of other points. This means that the location of one point has no influence on where other points land, ensuring that no clustering or repulsion occurs. Together, these two conditions—equal probability of placement and independence of points—ensure that the point pattern is completely random. If either condition is violated, the pattern is likely not CSR, suggesting clustering or dispersion instead.
+
+*ii.	What are your null/alternative hypotheses in point pattern analyses? *
+
+In point pattern analyses, the null hypothesis (H₀) posits that the spatial distribution of points is CSR. This implies that points are equally likely to occur anywhere within the study area, with no preference for specific locations. Furthermore, the placement of one point does not influence the placement of others, ensuring independence of points. CSR assumes no clustering or systematic spacing between points, making it the default or baseline spatial pattern for comparison.
+
+The alternative hypothesis (Hₐ), on the other hand, suggests that the spatial distribution of point deviates from CSR, indicating the presence of either clustering or dispersion. Clustering occurs when points are concentrated in specific areas, often reflecting an underlying attraction between points, such as hotspots of activity. Dispersion, in contrast, refers to points being more evenly spaced than expected under randomness, which might suggest repulsion or avoidance behaviors, such as territoriality.
 
 ## 2.2 The Quadrat method 
 
@@ -49,6 +60,7 @@ install.packages("D:/SpatialStat/HW 4/Package/spatstat.explore_3.3-3.tar.gz", re
 install.packages("D:/SpatialStat/HW 4/Package/maptools_1.1-6.tar.gz", repos = NULL)
 ```
 
+
 ```{r}
 library(graphics)
 library(maptools)
@@ -64,6 +76,8 @@ library(geostatsp)
 library(spatialEco)
 library(spatstat.core)
 ```
+
+
 ```{r}
 #Setting working directory
 setwd("D:/SpatialStat/K-Function/0. Quadrat Analysis Data/Quadrat Analysis Data")
@@ -82,6 +96,8 @@ BoundaryPolygonsOW<- as(BoundaryPolygons, "owin")
 plot(BoundaryPolygonsOW, main=NULL)
 title(main = "Point Pattern Analysis")
 ```
+
+
 ```{r}
 #Reading in the file with the points
 Pts <- read.table("Quadrat Points.txt", header=T, sep="\t", colClasses = c("X"="double"))
@@ -144,6 +160,7 @@ plot(pp, add=T)
 i.	What does this method entail?  That is, describe the method and be sure to write about it in your own words. Be sure to specify the study area you are using here.
 ii.	What statistical test will you use here? What is the test statistic? That is, how do you determine whether you have significant clustering or dispersion (uniformity)? Include the relevant formulas and be sure to describe them and all the terms that they include.
 iii.	What are the limitations of the Nearest Neighbor Analysis? In particular, compare the problem at hand with the hospital example in the slides.
+
 ```{r}
 #NEAREST NEIGHBOR ANALYSIS
 #Now let's try some Nearest Neighbor Analysis!
@@ -171,6 +188,7 @@ pval
 NNI
 ```
 
+
 ```{r}
 #spatialEco package has an nni function which unfortunately doesn't take 
 #user-defined study area files
@@ -191,6 +209,7 @@ v.	Talk about the nonhomogeneous K-Functions – that is, situations when you ne
 1.	Briefly describe when/where this would be appropriate
 2.	In your own words, describe how this may be done
 a.	Hint: this is what is done in the last 25 or so slides.
+
 
 ```{r}
 #K-FUNCTIONS
@@ -232,6 +251,7 @@ plot(pp,add=T)
 
 ```
 
+
 ```{r}
 #http://www.math.umt.edu/graham/stat544/ripleys.pdf
 #If we double click on the khat data set on the right, it will have 513 observations
@@ -258,6 +278,7 @@ Kenv <- spatstat.core::envelope(pp,fun="Kest", rmax=250000, nsim=9, nrank=1)
 plot(Kenv,xlab="r",ylab="Khat(r)", cex.lab=1.6,cex.axis=1.5,main= 
        "Ripley's Khat with Confidence Envelopes",cex.main=1.5,lwd=2)
 ```
+
 
 ```{r}
 #L-Functions
