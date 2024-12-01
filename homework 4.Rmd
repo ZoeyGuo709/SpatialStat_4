@@ -298,6 +298,7 @@ The analysis strongly suggests that the spatial distribution of points is consis
 *i.	Describe the results, and be sure to specify what the beginning and incremental distances were, and why you set them at those levels.*
 
 *1.	Do you reject the null hypothesis? At what distances?*
+
 *ii.	Without actually doing the analyses, do you expect that the reason for not seeing any farmers markets in Northeast Philly and certain parts of North and South Philly is that the population in that part of the city is too low? That is, do you expect that you would get different results if you were to take population (say, at the zip code level) into consideration?*
 
 
