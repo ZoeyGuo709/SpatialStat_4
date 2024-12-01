@@ -28,8 +28,21 @@ The alternative hypothesis (Hₐ), on the other hand, suggests that the spatial 
 
 ## 2.2 The Quadrat method 
 
-i.	What does this method entail? That is, describe the method and be sure to write about it in your own words.
-ii.	Discuss the limitations of the Quadrat method and why it’s generally not used in practice.
+*i.	What does this method entail? That is, describe the method and be sure to write about it in your own words.*
+The Quadrat Method is a spatial analysis technique used to study the distribution of points within a defined area. It involves dividing the study region into smaller, equally sized square cells called quadrats. The number of points (e.g., events, features, or observations) in each quadrat is then counted and analyzed to determine whether the points are randomly distributed, clustered, or evenly dispersed across the area.
+
+*ii.	Discuss the limitations of the Quadrat method and why it’s generally not used in practice.*
+
+This Method, while simple and widely used for basic spatial pattern analysis, has several significant limitations that make it less practical for more detailed or complex studies. One of the primary issues is its sensitivity to cell size. The choice of cell size greatly influences the results, as smaller cells may highlight variability and create many empty quadrats, while larger cells can obscure detailed patterns. This variability can lead to inconsistent or misleading interpretations, depending on the scale chosen.
+
+Another major limitation is the method’s dependence on grid orientation and range. Slight changes in how the grid is placed over the study area or adjustments to the boundaries of the analysis can result in different outcomes, even when the underlying spatial pattern remains unchanged. This introduces a level of subjectivity, making it harder to ensure objectivity and reproducibility in the analysis.
+
+Additionally, the quadrat method simplifies spatial data by converting the spatial distribution of points into counts within cells. This aggregation often leads to a loss of detailed spatial information. For example, two distinct patterns, such as clustered and evenly dispersed points, can produce identical quadrat counts, which limits the method’s ability to distinguish between these patterns effectively.
+
+The method also suffers from the Modifiable Areal Unit Problem (MAUP), where the choice of how the space is divided into quadrats influences the results. This arbitrary division can introduce bias and reduce the reliability of findings. Combined with its inability to analyze multi-scale patterns or complex spatial relationships, the quadrat method is often overshadowed by more advanced techniques such as Ripley’s K-function or kernel density estimation, which provide deeper insights and are less susceptible to these issues.
+
+In conclusion, while the quadrat method is useful for introductory spatial analysis due to its simplicity, its reliance on arbitrary decisions, loss of detail, and limited analytical power make it less practical for addressing modern spatial problems. More sophisticated methods are typically preferred for robust and detailed spatial analyses.
+
 
 ```{r setup}
 
@@ -61,7 +74,9 @@ install.packages("D:/SpatialStat/HW 4/Package/maptools_1.1-6.tar.gz", repos = NU
 ```
 
 
-```{r}
+
+
+```{r library}
 library(graphics)
 library(maptools)
 library(spatstat)
@@ -78,13 +93,21 @@ library(spatstat.core)
 ```
 
 
+
+## 2.3 The Nearest Neighbor Analysis method
+
+*i.	What does this method entail?  That is, describe the method and be sure to write about it in your own words. Be sure to specify the study area you are using here.*
+
+*ii.	What statistical test will you use here? What is the test statistic? That is, how do you determine whether you have significant clustering or dispersion (uniformity)? Include the relevant formulas and be sure to describe them and all the terms that they include.*
+
+*iii.	What are the limitations of the Nearest Neighbor Analysis? In particular, compare the problem at hand with the hospital example in the slides.*
+
 ```{r}
 #Setting working directory
-setwd("D:/SpatialStat/K-Function/0. Quadrat Analysis Data/Quadrat Analysis Data")
+setwd("./Data/Quadrat Analysis Data")
 
 #Reading Polygon Boundary.shp from the directory above
-Boundary <- rgdal::readOGR(dsn = "D:/SpatialStat/K-Function/0. Quadrat Analysis Data/Quadrat Analysis Data", layer = "Boundary")
-
+Boundary <- rgdal::readOGR('.', 'Boundary')
 
 #Class "SpatialPolygons" holds polygon topology (without attributes)
 BoundaryPolygons <- as(Boundary, "SpatialPolygons")
@@ -92,79 +115,20 @@ BoundaryPolygons <- as(Boundary, "SpatialPolygons")
 #The class "owin" is a way of specifying the observation window for a point pattern.
 BoundaryPolygonsOW<- as(BoundaryPolygons, "owin")
 
-#Plotting the Boundary Window
-plot(BoundaryPolygonsOW, main=NULL)
-title(main = "Point Pattern Analysis")
-```
-
-
-```{r}
-#Reading in the file with the points
 Pts <- read.table("Quadrat Points.txt", header=T, sep="\t", colClasses = c("X"="double"))
-#Very roughly speaking, using attach() in R is like relying on the implicit use of the 
-#most recent data set. 
-#http://www.r-bloggers.com/to-attach-or-not-attach-that-is-the-question/
-#Only attach file once. If you do it more than once, use detach(Pts) command 1+ times
-#to detach file
-#attach(Pts)
-#detach(Pts)
-pp <- ppp(Pts$X, Pts$Y, window=BoundaryPolygonsOW)
-#If the following error message is received: data contain duplicated points
-#Use the command duplicated(X,Y) to see which points are duplicates.
-#The command cbind(Pts,duplicated(X,Y)) will show you which points have duplicated values
-#In general, unless you know that the duplicates shouldn't be there, you would ignore
-#this warning.
 
-#Now let's plot the points and the Boundary.
-plot(pp, main=NULL)
-title(main = "Point Pattern Analysis")
+pp <- ppp(Pts$X, Pts$Y, window=BoundaryPolygonsOW)
 ```
 
 ```{r}
-#First let's create a matrix that only includes the x & y coordinates of each point.
-#This is simply the last two columns of matrix Pts.
-xy <-Pts[,2:3]
-
-#In order for R to consider xy a spatial object, we need to convert it to 
-#class SpatialPoints. We do it like this:
-xysp <-SpatialPoints(xy)
-
-#Now, let's use the mcp (minimum convex polygon) function to generate the mcp and
-#plot the points with the mcp
-#If we wanted to exclude some outlier points (e.g., 5 of the 100 points in the data)
-#we would specify a different percent value below (e.g., 95 instead of 100)
-cp <- mcp(xysp, percent=100)
-
-#The class "owin" is a way of specifying the observation window for a point pattern.
-cpnew <- as(cp, "owin")
-
-#Here, we are using the attached dataset Pts to plot X and Y coordinates within the
-#window cpnew.
-mcpoly <- ppp(Pts$X,Pts$Y, window=cpnew)
-plot(mcpoly, main=NULL)
-
-
-#A few pretty cool things we can do with the data:
-#1. Generate the kernel density map of the points
+# Generate the kernel density map of the points
 plot(density(pp))
-#2. Generate the countour map. The add=TRUE (or add=T) is a way for R to know that
-#you want the new plot to be added onto the existing plot.
-contour(density(pp), add=TRUE)
-#3. Add points on top of the maps
-plot(pp, add=T)
-
 ```
 
-
-## 2.3 The Nearest Neighbor Analysis method
-i.	What does this method entail?  That is, describe the method and be sure to write about it in your own words. Be sure to specify the study area you are using here.
-ii.	What statistical test will you use here? What is the test statistic? That is, how do you determine whether you have significant clustering or dispersion (uniformity)? Include the relevant formulas and be sure to describe them and all the terms that they include.
-iii.	What are the limitations of the Nearest Neighbor Analysis? In particular, compare the problem at hand with the hospital example in the slides.
 
 ```{r}
 #NEAREST NEIGHBOR ANALYSIS
-#Now let's try some Nearest Neighbor Analysis!
-dev.off() 
+
 #Computes the distance from each point to its nearest neighbour in a point pattern.
 nnd <- nndist.ppp(pp)
 #Using the formulas on the slides, we calculate Mean Observed Distance,
@@ -317,18 +281,30 @@ plot(L2,xlab="r",ylab="Lhat(r)", cex.lab=1.6,cex.axis=1.5,
 # 3. Results
 
 ## 3.1 Present results of the Nearest Neighbor Analysis
-i.	Describe the results. Do you reject the null hypothesis? 
+```{r}
+
+```
+
+*i.	Describe the results. Do you reject the null hypothesis? *
+n the Nearest Neighbor Analysis, the Nearest Neighbor Ratio (NNR) is 0.995357, which is extremely close to 1, indicating that the spatial distribution is highly likely to be random. The z-score, which measures how far the observed pattern deviates from randomness in terms of standard deviations, is -0.069945. This value is nearly zero, suggesting no significant deviation from randomness. The p-value is 0.944237, representing the probability of observing this pattern if the null hypothesis of randomness is true. Since the p-value is much greater than the commonly used threshold of 0.05, there is insufficient evidence to reject the null hypothesis.
+
+The analysis strongly suggests that the spatial distribution of points is consistent with randomness. There is no statistically significant evidence to indicate clustering or dispersion in the pattern.
 
 ## 3.2 Present results of the K-function Analysis
-i.	Describe the results, and be sure to specify what the beginning and incremental distances were, and why you set them at those levels.
-1.	Do you reject the null hypothesis? At what distances?
-ii.	Without actually doing the analyses, do you expect that the reason for not seeing any farmers markets in Northeast Philly and certain parts of North and South Philly is that the population in that part of the city is too low? That is, do you expect that you would get different results if you were to take population (say, at the zip code level) into consideration?
+```{r}
+
+```
+
+*i.	Describe the results, and be sure to specify what the beginning and incremental distances were, and why you set them at those levels.*
+
+*1.	Do you reject the null hypothesis? At what distances?*
+*ii.	Without actually doing the analyses, do you expect that the reason for not seeing any farmers markets in Northeast Philly and certain parts of North and South Philly is that the population in that part of the city is too low? That is, do you expect that you would get different results if you were to take population (say, at the zip code level) into consideration?*
 
 
 # 4. Discussion
-a.	Are the results obtained with the Nearest Neighbor Analysis and K-function Analysis consistent with each other?
-b.	Are they consistent with your expectations, based on the visual examination of the point data, and given the limitations of each method?
-c.	Does it seem to be the case that areas with lower median incomes have fewer farmers markets? Without doing any statistical tests, present a map of the farmers markets overlaid on a map of median household income at the zip code level and discuss. The Philadelphia_ZipCodes shapefile has the MedIncome variable which is the median household income for the year 2000.
-d.	What conclusions can you make based on these findings? That is, can you conclude that farmers markets are clustered in Philly? 
-e.	What might the policy implications of these findings be?
+*a.	Are the results obtained with the Nearest Neighbor Analysis and K-function Analysis consistent with each other?*
+*b.	Are they consistent with your expectations, based on the visual examination of the point data, and given the limitations of each method?*
+*c.	Does it seem to be the case that areas with lower median incomes have fewer farmers markets? Without doing any statistical tests, present a map of the farmers markets overlaid on a map of median household income at the zip code level and discuss. The Philadelphia_ZipCodes shapefile has the MedIncome variable which is the median household income for the year 2000.*
+*d.	What conclusions can you make based on these findings? That is, can you conclude that farmers markets are clustered in Philly? *
+*e.	What might the policy implications of these findings be?*
 
