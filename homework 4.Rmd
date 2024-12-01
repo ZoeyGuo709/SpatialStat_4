@@ -43,55 +43,56 @@ The method also suffers from the Modifiable Areal Unit Problem (MAUP), where the
 
 In conclusion, while the quadrat method is useful for introductory spatial analysis due to its simplicity, its reliance on arbitrary decisions, loss of detail, and limited analytical power make it less practical for addressing modern spatial problems. More sophisticated methods are typically preferred for robust and detailed spatial analyses.
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "C:/Users/eugeneby/Dropbox/Documents/Work and School/Teaching/CPLN 671 - Statistics and Data Mining/Point Pattern Analysis/Data/Quadrat Analysis Data")
 
-```{r setup}
+#install.packages(c("sp", "ISLR", "MASS", "spatstat", "spatial", "maptools", "ppp", "fossil", "adehabitatHR", "gdata", "raster", "rgdal", "spatialEco", "spatstat.explore", "spatstat.model", "proxy", "sf"))
 
-knitr::opts_chunk$set(echo = FALSE)
-options(scipen=999)
-#https://www.e-education.psu.edu/geog586/l5_p9.html
-
-install.packages("sp")
-install.packages("ISLR")
-install.packages("MASS")
-install.packages("spatstat")
-install.packages("spatial")
-install.packages("maptools")
-install.packages("ppp")
-install.packages("fossil")
-install.packages("adehabitatHR")
-install.packages("gdata")
-install.packages("raster")
-install.packages("rgdal")
-install.packages("geostatsp")
-install.packages("spatialEco")
-install.packages("spatstat.core")
-
-#Install SpatStat
-install.packages("D:/SpatialStat/HW 4/Package/spatstat.explore_3.3-3.tar.gz", repos = NULL)
-
-#Install SpatStat
-install.packages("D:/SpatialStat/HW 4/Package/maptools_1.1-6.tar.gz", repos = NULL)
-```
-
-
-
-
-```{r library}
 library(graphics)
 library(maptools)
 library(spatstat)
 library(sp)
+library(sf)
 library(fossil)
 library(spatial)
 library(adehabitatHR)
 library(gdata)
 library(raster)
 library(rgdal)
-library(geostatsp)
 library(spatialEco)
-library(spatstat.core)
+library(spatstat.model)
+library(spatstat.explore)
+library(proxy)
+
+knitr::opts_chunk$set(echo = TRUE)
+
+options(scipen=999)
 ```
 
+
+```{r warning=FALSE, message=FALSE, cache=FALSE}
+Boundary <- rgdal::readOGR('.', 'Boundary')
+BoundaryPolygons <- as(Boundary, "SpatialPolygons")
+BoundaryPolygonsOW<- as(BoundaryPolygons, "owin")
+plot(BoundaryPolygonsOW, main=NULL)
+title(main = "Point Pattern Analysis")
+```
+
+
+```{r warning=FALSE, message=FALSE, cache=FALSE}
+setwd("C:\\Users\\eugeneby\\Dropbox\\Documents\\Work and School\\Teaching\\CPLN 671 - Statistics and Data Mining\\Data\\Lecture 19 - 21 - R\\Point Pattern Analysis\\Data\\Quadrat Analysis Data")
+Pts <- read.table("Quadrat Points.txt", header=T, sep="\t", colClasses = c("X"="double"))
+pp <- ppp(Pts$X, Pts$Y, window=BoundaryPolygonsOW)
+plot(pp, main=NULL)
+title(main = "Point Pattern Analysis")
+```
+
+
+```{r}
+# Generate the kernel density map of the points
+plot(density(pp))
+```
 
 
 ## 2.3 The Nearest Neighbor Analysis method
@@ -102,54 +103,43 @@ library(spatstat.core)
 
 *iii.	What are the limitations of the Nearest Neighbor Analysis? In particular, compare the problem at hand with the hospital example in the slides.*
 
-```{r}
-#Setting working directory
-setwd("./Data/Quadrat Analysis Data")
 
-#Reading Polygon Boundary.shp from the directory above
-Boundary <- rgdal::readOGR('.', 'Boundary')
-
-#Class "SpatialPolygons" holds polygon topology (without attributes)
-BoundaryPolygons <- as(Boundary, "SpatialPolygons")
-
-#The class "owin" is a way of specifying the observation window for a point pattern.
-BoundaryPolygonsOW<- as(BoundaryPolygons, "owin")
-
-Pts <- read.table("Quadrat Points.txt", header=T, sep="\t", colClasses = c("X"="double"))
-
-pp <- ppp(Pts$X, Pts$Y, window=BoundaryPolygonsOW)
-```
-
-```{r}
-# Generate the kernel density map of the points
-plot(density(pp))
-```
-
-
-```{r}
-#NEAREST NEIGHBOR ANALYSIS
-
-#Computes the distance from each point to its nearest neighbour in a point pattern.
+```{r warning=FALSE, message=FALSE, cache=FALSE}
 nnd <- nndist.ppp(pp)
-#Using the formulas on the slides, we calculate Mean Observed Distance,
-#Mean Expected Distance and the Standard Error.
-MeanObsDist <- mean(nnd)
-#The area.owin command calculates the area of the study area that you use.
-#Here it's the minimum enclosing rectangle, but it doesn't have to be - it 
-#could be any shapefile you import from ArcGIS (or generate in R) that 
-#corresponds to the study area.
+#Average Observed Distance
+MeanObsDist <- mean(nnd)  
+#Average Expected Distance
 MeanExpDist <- 0.5 / sqrt(nrow(Pts) / area.owin(BoundaryPolygonsOW))
+#Standard Error
 SE <- 0.26136 / sqrt(nrow(Pts)*nrow(Pts) / area.owin(BoundaryPolygonsOW))
-#Calculating the z-score
-zscore <- (MeanObsDist - MeanExpDist)/SE
-#Statistical test
-#Here, if the z score is positive, we do an upper-tailed test and if the 
-#z score is negative we do a lower-tailed test to come up with the p-value.
-pval<-ifelse(zscore > 0, 1 - pnorm(zscore), pnorm(zscore))
-#Calculating the NNI
-NNI <- MeanObsDist / MeanExpDist
+```
+
+
+Now, we can carry out a z-test to see whether the spatial distribution of our points is random, or whether there is significant clustering or dispersion. Recall that H~0~ states that we have randomness, and H~a~ states that we have either clustering (if NNI is significantly less than 1) or dispersion (if NNI is significantly greater than 1). Here, the z-statistic is calculated as follows:
+
+$$ z= \frac{\overline{D}_O -\overline{D}_E }{SE_{\overline{D}_O}} $$
+
+Based on the z-statistic, we can calculate the p-value. If z < 0, we do a lower-tailed test to test for clustering, and if z > 0, we do an upper-tailed test to test for dispersion. 
+
+```{r warning=FALSE, message=FALSE, cache=FALSE}
+zscore <- (MeanObsDist - MeanExpDist)/SE                    #Calculating the z-score
+pval<-ifelse(zscore > 0, 1 - pnorm(zscore), pnorm(zscore))  #Calculating the p-value
+zscore
 pval
+```
+
+We can also easily calculate the NNI, simply as the ratio of the Average Observed Distance and Average Expected Distance.
+```{r warning=FALSE, message=FALSE, cache=FALSE}
+NNI <- MeanObsDist / MeanExpDist
 NNI
+```
+
+As an aside, the ` spatialEco` package has an ` nni` function which unfortunately doesn't take user-defined study area files. We would have to covert our data to an ` sf` objects as shown below. However, the results that we get are pretty similar to what we got above, and the slight difference is due to the fact that the convex hull is used as the study area in the ` nni` function.
+
+```{r warning=FALSE, message=FALSE, cache=FALSE}
+xy <- Pts[,c(2,3)]      
+sp.Pts <- st_as_sf(SpatialPointsDataFrame(coords=xy, data=Pts))   #Convert our data to a sf object
+spatialEco::nni(sp.Pts,win="hull")                                #Results are still pretty similar to results above
 ```
 
 
