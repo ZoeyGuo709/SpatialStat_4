@@ -1,0 +1,159 @@
+---
+title: "CPLN671-Assignment4"
+author: "Emily Zhou"
+date: "2024-12-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r load packages, message=FALSE, warning=FALSE, include=FALSE}
+
+options(scipen=999)
+options(digits = 3)
+
+packages <- c("tidyverse", "sf", "here", "ggplot2", "kableExtra", "patchwork", "gmodels", "ggcorrplot", " ", "spatstat")
+
+package.check <- lapply(
+  packages,
+  FUN = function(x) {
+    if (!require(x, character.only = TRUE)) {
+      install.packages(x, dependencies = TRUE, quietly=TRUE)
+      library(x, character.only = TRUE)
+    }
+  }
+)
+
+```
+
+
+```{r}
+
+market <- read_sf(here("data", "Philadelphia_Farmers_Markets201302.shp"))
+zipcode <- read_sf(here("data", "Philadelphia_ZipCodes.shp"))
+philly <- read_sf(here("data", "Philadelphia.shp"))
+
+
+```
+
+
+```{r}
+
+ggplot() +
+  geom_sf(data = philly, fill = "grey", color = "black") +
+  geom_sf(data = zipcode, fill = NA, color = "black") +
+  geom_sf(data = market, color = "red", size = 2) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+```
+
+
+
+
+```{r nearest neighbor analysis}
+
+# Define the study area window
+philly_window <- as.owin(st_transform(philly, crs = st_crs(market)))
+
+# Extract point coordinates and convert to `ppp`
+market_coords <- st_coordinates(market)
+market_pp <- ppp(x = market_coords[,1], y = market_coords[,2], window = philly_window)
+
+# Nearest neighbor analysis
+nnd <- nndist.ppp(market_pp)
+
+# Average Observed Distance
+MeanObsDist <- mean(nnd)  
+
+# Average Expected Distance
+# The expected mean nearest neighbor distance under Complete Spatial Randomness (CSR).
+n <- npoints(market_pp)
+area <- area.owin(market_pp$window)
+MeanExpDist <- 0.5 / sqrt(n / area)
+
+#Standard Error
+SE <- 0.26136 / sqrt(n*n / area)
+```
+
+
+```{r}
+
+# Determine whether the observed pattern deviates significantly from CSR.
+zscore <- (MeanObsDist - MeanExpDist)/SE                    #Calculating the z-score
+pval<-ifelse(zscore > 0, 1 - pnorm(zscore), pnorm(zscore))  #Calculating the p-value
+zscore
+pval
+
+```
+
+
+```{r}
+
+NNI <- MeanObsDist / MeanExpDist
+NNI
+
+```
+
+
+```{r k functions analysis}
+
+max.distance <- max(proxy::dist(
+  data.frame(cbind(x = market_coords[,1], y = market_coords[,2])),
+  method = "euclidean"
+))
+max.distance
+
+
+```
+
+
+```{r}
+
+khat <-Kest(market_pp, rmax=28000, correction="Ripley")
+plot(khat$r,khat$iso,xlab="r", ylab="Ripley's K",
+     main="Ripley's Estimated K-Function",
+     cex.lab=1.6,cex.axis=1.5,cex.main=1.5,lty=1,lwd=2)
+lines(khat$r,khat$theo,lty=8, lwd=2) 
+```
+
+```{r}
+
+Kenv <- spatstat.explore::envelope(market_pp,fun="Kest", rmax=28000, nsim=9, nrank=1) 
+plot(Kenv,xlab="r",ylab="Khat(r)", cex.lab=1.6,cex.axis=1.5,main= 
+       "Ripley's Khat with Confidence Envelopes",cex.main=1.5,lwd=2)
+```
+
+```{r}
+
+lhat <- Lest(market_pp, rmax=28000, correction="Ripley") 
+plot(lhat$r,lhat$iso-lhat$r, xlab="r",ylab="Ripley's L",cex.lab=1.6,  
+     cex.axis=1.5,cex.main=1.5,lty=1,lwd=2, main="Ripley's Estimated L-Function") 
+lines(lhat$r,lhat$theo-lhat$r,lty=8,lwd=2) 
+```
+
+
+```{r}
+
+Lenv <- spatstat.explore::envelope(market_pp,fun="Lest", rmax=28000, nsim=9,nrank=1)
+plot(Lenv,xlab="r",ylab="Lhat(r)", cex.lab=1.6,cex.axis=1.5,
+     main= "Ripley's L-function with Confidence Envelopes",cex.main=1.5,lwd=2,legend=F)
+
+```
+
+```{r}
+L2 <- Lenv 
+L2$obs <- L2$obs-L2$r
+L2$theo <- L2$theo-L2$r
+L2$lo <- L2$lo-L2$r
+L2$hi <- L2$hi-L2$r
+
+plot(L2,xlab="r",ylab="Lhat(r)", cex.lab=1.6,cex.axis=1.5,
+     main= "Ripley's L-function with Confidence Envelopes",cex.main=1.5,lwd=2,legend=F)
+```
+
+
+

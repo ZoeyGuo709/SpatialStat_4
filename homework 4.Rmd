@@ -5,8 +5,10 @@ date: "2024-11-29"
 output: html_document
 ---
 
-# 1. Introduction:
+# 1. Introduction
+
 *1 paragraph introduction to the problem, which describes the importance of the issue, and briefly states what you will be doing in this report.*
+
 Access to fresh and healthy food is a pressing issue in many American cities, leading to significant public health challenges and exacerbating food access inequities, particularly in underserved communities. In Philadelphia, the Food Trust has established farmers' markets across the city as a strategy to provide residents with fresh, nutritious food. However, some neighborhoods still face limited or no access to these markets, raising concerns about the equitable distribution of this vital resource. This report examines the spatial distribution of farmers' markets in Philadelphia using point pattern analysis to determine whether they are randomly placed, clustered, or dispersed, and to identify areas lacking access to these essential food sources.
 
 # 2. Methodology:
