@@ -1,9 +1,28 @@
 ---
-title: "CPLN671-Assignment4"
-author: "Emily Zhou"
-date: "2024-12-03"
-output: html_document
+title: "Examining the Spatial Clustering of Farmers Markets in Philadelphia"
+author: "Emily Zhou, Ziyi Guo, Emma Jiang"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    theme: simplex
+    mathjax: default
+    toc: yes
+    toc_float: yes
+    code_folding: show
+    code_download: yes
+
+editor_options:
+  markdown:
+    wrap: sentence
 ---
+
+
+Version 1.0 | First Created Dec 3, 2024 | Updated Dec , 2024
+
+Keywords: Nearest Neighbor Index (NNI), Ripley's K-Function, Ripley's L-Function, Spatial Clustering
+
+GitHub Repository: [CPLN671-Point-Pattern-Analysis](https://github.com/ZoeyGuo709/SpatialStat_4)
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -15,7 +34,7 @@ knitr::opts_chunk$set(echo = TRUE)
 options(scipen=999)
 options(digits = 3)
 
-packages <- c("tidyverse", "sf", "here", "ggplot2", "kableExtra", "patchwork", "gmodels", "ggcorrplot", " ", "spatstat")
+packages <- c("tidyverse", "sf", "here", "ggplot2", "kableExtra", "patchwork","spatstat.explore", "spatstat", "proxy")
 
 package.check <- lapply(
   packages,
@@ -30,7 +49,178 @@ package.check <- lapply(
 ```
 
 
-```{r}
+# Introduction 
+
+Access to fresh and healthy food is a pressing issue in many American cities, leading to significant public health challenges and exacerbating food access inequities, particularly in under-served communities. In Philadelphia, the Food Trust has established farmers' markets across the city as a strategy to provide residents with fresh, nutritious food. However, some neighborhoods still face limited or no access to these markets, raising concerns about the equitable distribution of this vital resource. This report examines the spatial distribution of farmers' markets in Philadelphia using point pattern analysis to determine whether they are randomly placed, clustered, or dispersed, and to identify areas lacking access to these essential food sources.
+
+# Methodology 
+
+## Hypothesis Testing 
+
+To set up the hypothesis for our analysis, we need to understand the concept of completely spatially random first. A point pattern is considered **Completely Spatially Random (CSR)** if the points within a defined area are distributed without any discernible pattern, and their placement is entirely random. CSR serves as a baseline model in spatial analysis, helping researchers determine whether a distribution is random, clustered, or dispersed. It is often used as a null hypothesis in point pattern analysis to assess deviations in spatial arrangements.
+
+To establish that a point pattern is CSR, two critical conditions must be met. First, the probability of a point landing in any location within the study area must be directly proportional to the size of that location. If the area is divided into equal-sized cells, each cell should have an equal likelihood of containing a point. For example, if a region is divided into 54 cells of equal area, the probability of a point being in any cell would be uniform, with each cell having a likelihood of \(1/54\).
+
+Second, the placement of one point must be entirely independent of the placement of other points. This means that the location of one point has no influence on where other points land, ensuring that no clustering or repulsion occurs. Together, these two conditions—equal probability of placement and independence of points—ensure that the point pattern is completely random. If either condition is violated, the pattern is likely not CSR, suggesting clustering or dispersion instead.
+
+Therefore, for our point pattern analysis, the null hypothesis here is that: 
+
+$$
+H_0: \text{The point pattern of farmer's market in Philadelphia follows completely spatially random.}
+$$
+
+This implies that points are equally likely to occur anywhere within the study area, with no preference for specific locations. Furthermore, the placement of one point does not influence the placement of others, ensuring independence of points. CSR assumes no clustering or systematic spacing between points, making it the default or baseline spatial pattern for comparison.
+
+On the other hand, the alternative hypothesis is that:
+
+$$
+H_a: \text{The point pattern of farmer's market in Philadelphia exhibits clustering or dispersion.}
+$$
+
+Clustering occurs when points are concentrated in specific areas, often reflecting an underlying attraction between points, such as hotspots of activity. Dispersion, in contrast, refers to points being more evenly spaced than expected under randomness, which might suggest repulsion or avoidance behaviors, such as territoriality.
+
+## The Quadrat Test
+
+The Quadrat Method is a typical spatial analysis technique used to study the distribution of points within a defined area. It involves dividing the study region into smaller, equally sized square cells called quadrats. The number of points (e.g., events, features, or observations) in each quadrat is then counted and analyzed to determine whether the points are randomly distributed, clustered, or evenly dispersed across the area. The counts are used to compute statistical measures, such as the variance-to-mean ratio such that if the VMR is close to 1, the points are likely distributed randomly. If the VMR is significantly greater than 1, the points are clustered, while a VMR less than 1 indicates dispersion.
+
+This method, while simple and widely used for basic spatial pattern analysis, has several significant limitations that make it less practical for more detailed or complex studies. One of the primary issues is its sensitivity to cell size. The choice of cell size greatly influences the results, as smaller cells may highlight variability and create many empty quadrats, while larger cells can obscure detailed patterns. This variability can lead to inconsistent or misleading interpretations, depending on the scale chosen.
+
+Another major limitation is the method’s dependence on grid orientation and range. Slight changes in how the grid is placed over the study area or adjustments to the boundaries of the analysis can result in different outcomes, even when the underlying spatial pattern remains unchanged. This introduces a level of subjectivity, making it harder to ensure objectivity and reproducibility in the analysis.
+
+Additionally, the quadrat method simplifies spatial data by converting the spatial distribution of points into counts within cells. This aggregation often leads to a loss of detailed spatial information. For example, two distinct patterns, such as clustered and evenly dispersed points, can produce identical quadrat counts, which limits the method’s ability to distinguish between these patterns effectively.
+
+The method also suffers from the Modifiable Areal Unit Problem (MAUP), where the choice of how the space is divided into quadrats influences the results. This arbitrary division can introduce bias and reduce the reliability of findings. Combined with its inability to analyze multi-scale patterns or complex spatial relationships, the quadrat method is often overshadowed by more advanced techniques such as Ripley’s K-function or kernel density estimation, which provide deeper insights and are less susceptible to these issues.
+
+## The Nearest Neighbor Analysis
+
+The Nearest Neighbor Analysis is another spatial statistical method used to assess whether the spatial distribution of points is random, clustered, or dispersed. The analysis involves calculating the nearest neighbor distances for each point in the dataset and comparing the observed distribution to a theoretical random distribution. 
+
+In this analysis, the study area is defined as the boundary of Philadelphia. All calculations are based on points representing farmers' market locations within this boundary. Then, for each point of farmer's market, the distance to its nearest neighbor (the closest point) is calculated. The mean observed nearest neighbor distance is calculated as: 
+
+$$
+\bar{d}_{\text{obs}} = \frac{\sum_{i=1}^{n} d_i}{n}
+$$
+
+where \(d_i\) is the nearest neighbor distance for point \(i\) and \(n\) is the total number of points. This value represents the average distance between points in the observed dataset.
+
+After that, the expected mean nearest neighbor distance under Complete Spatial Randomness (CSR) is calculated as:
+
+$$
+\bar{d}_{\text{exp}} = \frac{1}{2} \sqrt{\frac{A}{n}}
+$$
+
+where \(A\) is the area of the study region and \(n\) is the total number of points. This value represents the average distance between points expected under a random distribution.
+
+The nearest neighbor index (NNI) is then calculated as the ratio of the observed mean distance to the expected mean distance:
+
+$$
+\text{NNI} = \frac{\bar{d}_{\text{obs}}}{\bar{d}_{\text{exp}}}
+$$
+If the NNI is less than 1, it indicates clustering, while an NNI greater than 1 suggests dispersion. An NNI close to 1 indicates a random distribution.
+
+The standard error of the NNI is calculated as:
+
+$$
+\text{SE} = 0.26136 \cdot \sqrt{\frac{A}{n^2}}
+$$
+
+In addition to looking at the value of NNI, we can also use the z-score test statistic to compare the observed nearest neighbor distances to the expected distances under the assumption of complete spatial randomness (CSR), and to determine whether the observed pattern deviates significantly from CSR. The z-score is calculated as:
+
+$$
+z = \frac{\bar{d}_{\text{obs}} - \bar{d}_{\text{exp}}}{\text{SE}}
+$$
+The significance of the z-score is determined using the standard normal distribution. The p-value is calculated as: 
+
+$$
+p = 
+\begin{cases} 
+1 - \Phi(z) & \text{if } z > 0, \\ 
+\Phi(z) & \text{if } z \leq 0,
+\end{cases}
+$$
+
+where \(\Phi(z)\) is the cumulative distribution function of the standard normal distribution. Together, if the z-score is negative and the p-value is less than 0.05, we can reject the null hypothesis of CSR and conclude that the point pattern is significantly clustered. If the z-score is positive and the p-value is less than 0.05, we can reject the null hypothesis and conclude that the point pattern is significantly dispersed. If the z-score is close to 0 and the p-value is greater than 0.05, we fail to reject the null hypothesis, indicating a random distribution.
+
+The nearest neighbor analysis has the following limitations. First, it assumes that the study area is a simple polygon, which may not be the case for complex or irregularly shaped regions. This is the same as the problem we see with the hospital example in class, where the study area is not a simple polygon and ArcGIS uses the convex hull of the points to define the study area, leading the analysis output to be "not clustered" whereas the points are actually clustered. Second, NNA only considers the distance to the nearest neighbor, making it inadequate for capturing spatial patterns that occur at multiple scales, such as small clusters within a larger dispersed pattern.Third, NNA does not incorporate underlying drivers of spatial distribution, such as population density, demand, or accessibility. This can result in conclusions that overlook critical social, economic, or environmental factors.
+
+## K Function Analysis 
+
+The K function method takes into account the spatial arrangement of points over a range of distances. The idea behind  K function is that we would place circles, each of radius \(d\), around every event (point). Then, we count the number of other events (points) inside each circle of radius \(d\). Following that, we calculate the average number of other events (points) in all circles of radius \(d\). Finally, we divide this average count of other events by the overall event (i.e., point) density in the study area to get the K-function at distance \(d\), denoted as \(K(d)\):
+
+$$
+K(d) = \frac{\left( \sum_{i=1}^{n} \# [ S \in \text{Circle}(s_i, d) ] \right) / n}{n / a}
+$$
+
+where \(K(d)\) is the K-function at distance \(d\), \(\# [ S \in \text{Circle}(s_i, d) ]\) is the number of points \(S\) within a circle of radius \(d\) centered at point \(s_i\), \(n\) is the total number of points in the dataset, and \(a\) is the total area of the study region. The mean point density in the study region is given by \(n / a\). The previous steps are usually repeated for a range of values of \(d\).
+
+Under CSR, the expected value of the K-function is \(K(d) = \pi d^2\). If the observed K-function is significantly higher than the expected K-function at a given distance, it suggests clustering of points within that distance. Conversely, if the observed K-function is significantly lower than the expected K-function, it indicates dispersion of points within that distance.
+
+For ease of interpretation, the L-function, a transformation of the K-function, is defined as:
+
+$$
+L(d) = \sqrt{\frac{K(d)}{\pi}} - d
+$$
+
+In R, we will compute these functions using the `Kest()` function for the K-function and `Lest()` for the L-function, both of which are part of the spatstat package. 
+
+The K-function analysis begins by specifying a range of distances \( d \), starting from 0 and increasing incrementally by a chosen step size. The maximum distance is typically set to half the maximum distance between any two points in the study area. To calculate the maximum distance:
+
+$$
+d_{\text{max}} = \frac{1}{2} \cdot \max(\text{distance between any two points})
+$$
+
+In R, since the `Kest` function documentation urges users NOT to provide a vector of distance values at which the K-function should be evaluated, we only need to provide a value of `rmax`, which is the maximum distance at which the K-function is calculated.
+
+To test for clustering or dispersion, we need to calculate the confidence envelopes for \( L(d) \). This includes generating \( N \) random patterns under Complete Spatial Randomness (CSR), where \( N \) is typically 9, 99, or 999. Then, for each distance \( d \), calculate: the lowest value of \( L(d) \), denoted as \( L_-(d) \) (Lower Envelope), and the highest value of \( L(d) \), denoted as \( L_+(d) \) (Upper Envelope).
+
+The envelopes are defined as:
+
+$$
+L_-(d) = \min\{ L(d) \text{ from CSR simulations} \}
+$$
+
+
+$$
+L_+(d) = \max\{ L(d) \text{ from CSR simulations} \}
+$$
+For each distance \( d \), we need to compare the observed \( L_{\text{obs}}(d) \) to the confidence envelopes. If: 
+
+$$
+L_-(d) < L_{\text{obs}}(d) < L_+(d),
+$$
+then we fail to reject \( H_0 \): The pattern is not significantly different from CSR.
+
+However, if: 
+
+$$
+L_{\text{obs}}(d) > L_+(d),
+$$
+
+then we reject \( H_0 \) in favor of \( H_{A1} \): Significant clustering at distance \( d \).
+
+$$
+L_{\text{obs}}(d) < L_-(d),
+$$
+then reject \( H_0 \) in favor of \( H_{A2} \): Significant dispersion at distance \( d \).
+
+Points near the border of the study area require correction because circles extending beyond the border are incomplete. Two common edge corrections are:
+
+- **Ripley’s Edge Correction**: Corrects for the proportion of the circle falling inside the study area for each point.
+- **Simulate Outer Boundary Values Edge Correction**: Simulates values for circles extending beyond the study area.
+
+Ripley's edge correction is more commonly used because it is computationally efficient and well-supported in R packages like `spatstat`. In R, the edge correction is specified using the `correction` argument, which defaults to Ripley’s correction.
+
+**Inhomoegeneous K-Functions**
+
+One of the issues with K-Function analysis here is that when we do a statistical test, our original sample is being compared to 9, 99, or 999 randomly generated point patterns. However, these 9, 99, or 999 patterns are generated without taking into consideration the population density of the different counties, resulting in inappropriate comparisons. To address this issue, we can use Inhomogeneous K-Functions, which account for spatial patterns influenced by variations in an underlying reference measure, such as population density. 
+
+The nonhomogeneous K-Function is in fact, appropriate in many contexts where the spatial intensity of points is influenced by underlying covariates, such as analyzing disease incidence rates in areas with varying population densities or studying retail store locations where market demand differs spatially. 
+
+In ArcGIS, we could achieve this by preparing a polygon shapefile with population values for each area. Calculate a probability for each polygon by dividing its population by the total population, ensuring values range from 0 to 1, with higher population areas having higher probabilities. We add these probabilities as a new field in the attribute table, which we then convert the shapefile to a raster using the Convert Feature to Raster tool. Finally, we use the Create Spatially Balanced Points tool (in the Geostatistical Analyst extension) to generate points distributed according to the population-based probabilities. In R, the **spatstat.core** package introduced a new function called `Kinhom` as of last year to achieve this. 
+
+# Results 
+
+```{r load study data, message=FALSE, warning=FALSE, include=FALSE}
 
 market <- read_sf(here("data", "Philadelphia_Farmers_Markets201302.shp"))
 zipcode <- read_sf(here("data", "Philadelphia_ZipCodes.shp"))
@@ -40,21 +230,30 @@ philly <- read_sf(here("data", "Philadelphia.shp"))
 ```
 
 
-```{r}
+
+```{r quickly visualize data, message=FALSE, warning=FALSE}
 
 ggplot() +
-  geom_sf(data = philly, fill = "grey", color = "black") +
-  geom_sf(data = zipcode, fill = NA, color = "black") +
-  geom_sf(data = market, color = "red", size = 2) +
-  theme_minimal() +
-  theme(legend.position = "none")
-
+  geom_sf(data = philly, fill = "grey80") +
+  geom_sf(data = zipcode, fill = NA, color = "white") +
+  geom_sf(data = market, color = "#c44536", size = 1.5) +
+  theme(
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        plot.title = element_text(size = 12, face = "bold"),
+        panel.background = element_blank(),
+        panel.border = element_rect(colour = "grey", fill=NA, size=0.4)
+        ) +
+  labs(title = "Farmers Markets in Philadelphia")
 ```
 
 
+## Nearest Neighbor Analysis
 
 
-```{r nearest neighbor analysis}
+```{r prepare data for nearest neighbor analysis, message=FALSE, warning=FALSE}
 
 # Define the study area window
 philly_window <- as.owin(st_transform(philly, crs = st_crs(market)))
@@ -62,6 +261,11 @@ philly_window <- as.owin(st_transform(philly, crs = st_crs(market)))
 # Extract point coordinates and convert to `ppp`
 market_coords <- st_coordinates(market)
 market_pp <- ppp(x = market_coords[,1], y = market_coords[,2], window = philly_window)
+
+```
+
+
+```{r nearest neighbor analysis, message=FALSE, warning=FALSE}
 
 # Nearest neighbor analysis
 nnd <- nndist.ppp(market_pp)
@@ -80,71 +284,115 @@ SE <- 0.26136 / sqrt(n*n / area)
 ```
 
 
-```{r}
+```{r nearest neighbor analysis results, message=FALSE, warning=FALSE}
 
-# Determine whether the observed pattern deviates significantly from CSR.
-zscore <- (MeanObsDist - MeanExpDist)/SE                    #Calculating the z-score
+NNI <- MeanObsDist / MeanExpDist # Nearest Neighbor Index
+zscore <- (MeanObsDist - MeanExpDist)/SE  #Calculating the z-score
 pval<-ifelse(zscore > 0, 1 - pnorm(zscore), pnorm(zscore))  #Calculating the p-value
-zscore
-pval
+
+results <- data.frame(
+  Metric = c("Nearest Neighbor Index (NNI)", "Z-Score", "P-Value"),
+  Value = c(round(NNI, 3), round(zscore, 3), round(pval, 7))
+)
+
+results %>%
+  kable("html", col.names = c("Metric", "Value")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
 
 ```
 
 
-```{r}
+## K Function Analysis
 
-NNI <- MeanObsDist / MeanExpDist
-NNI
+```{r prepare data for K-function analysis, message=FALSE, warning=FALSE}
 
-```
-
-
-```{r k functions analysis}
+# Compute the maximum Euclidean distance between points in the dataset. 
+# This determines the extent of distances over which the spatial pattern will be analyzed.
 
 max.distance <- max(proxy::dist(
   data.frame(cbind(x = market_coords[,1], y = market_coords[,2])),
   method = "euclidean"
 ))
-max.distance
 
+cat("Maximum Distance:", max.distance, "\n")
 
 ```
 
 
-```{r}
+```{r k-function analysis, message=FALSE, warning=FALSE}
+
+# Calculate and visualize Ripley’s K-function
+# This evaluates spatial clustering or dispersion over varying distances.
 
 khat <-Kest(market_pp, rmax=28000, correction="Ripley")
 plot(khat$r,khat$iso,xlab="r", ylab="Ripley's K",
      main="Ripley's Estimated K-Function",
      cex.lab=1.6,cex.axis=1.5,cex.main=1.5,lty=1,lwd=2)
 lines(khat$r,khat$theo,lty=8, lwd=2) 
+
 ```
 
 ```{r}
+khat_df <- data.frame(
+  r = khat$r,             # Distance values
+  iso = khat$iso,         # Observed K(r) (isotropic)
+  theo = khat$theo        # Theoretical K(r)
+)
 
+# Create the ggplot
+ggplot(khat_df, aes(x = r)) +
+  geom_line(aes(y = iso, color = "Observed K(r)"), size = 1) +
+  geom_line(aes(y = theo, color = "Theoretical K(r)"), linetype = "dashed", size = 1) +
+  labs(
+    x = "r (Distance)",
+    y = "Ripley's K-Function",
+    title = "Ripley's Estimated K-Function",
+    color = "Legend"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    legend.position = "top"
+  )
+
+```
+
+
+
+```{r k-function analysis confidence envelopes, message=FALSE, warning=FALSE}
+
+# Assess statistical significance by creating confidence envelopes around the observed K-function.
 Kenv <- spatstat.explore::envelope(market_pp,fun="Kest", rmax=28000, nsim=9, nrank=1) 
 plot(Kenv,xlab="r",ylab="Khat(r)", cex.lab=1.6,cex.axis=1.5,main= 
        "Ripley's Khat with Confidence Envelopes",cex.main=1.5,lwd=2)
+
 ```
 
-```{r}
+```{r k-function analysis adjusted, message=FALSE, warning=FALSE}
+
+# Compute and visualize Ripley’s L-function. 
+# This linearizes the K-function for easier interpretation.
 
 lhat <- Lest(market_pp, rmax=28000, correction="Ripley") 
 plot(lhat$r,lhat$iso-lhat$r, xlab="r",ylab="Ripley's L",cex.lab=1.6,  
      cex.axis=1.5,cex.main=1.5,lty=1,lwd=2, main="Ripley's Estimated L-Function") 
 lines(lhat$r,lhat$theo-lhat$r,lty=8,lwd=2) 
+
 ```
 
 
-```{r}
+```{r k-function analysis adjusted confidence envelopes, message=FALSE, warning=FALSE}
 
+# Create confidence envelopes for the L-function.
 Lenv <- spatstat.explore::envelope(market_pp,fun="Lest", rmax=28000, nsim=9,nrank=1)
 plot(Lenv,xlab="r",ylab="Lhat(r)", cex.lab=1.6,cex.axis=1.5,
      main= "Ripley's L-function with Confidence Envelopes",cex.main=1.5,lwd=2,legend=F)
 
 ```
 
-```{r}
+```{r better viz, message=FALSE, warning=FALSE}
+
+# Adjust the observed and envelope values of the L-function to emphasize deviations from CSR.
 L2 <- Lenv 
 L2$obs <- L2$obs-L2$r
 L2$theo <- L2$theo-L2$r
@@ -155,5 +403,12 @@ plot(L2,xlab="r",ylab="Lhat(r)", cex.lab=1.6,cex.axis=1.5,
      main= "Ripley's L-function with Confidence Envelopes",cex.main=1.5,lwd=2,legend=F)
 ```
 
+#	Discussion
+
+a.	Are the results obtained with the Nearest Neighbor Analysis and K-function Analysis consistent with each other?
+b.	Are they consistent with your expectations, based on the visual examination of the point data, and given the limitations of each method?
+c.	Does it seem to be the case that areas with lower median incomes have fewer farmers markets? Without doing any statistical tests, present a map of the farmers markets overlaid on a map of median household income at the zip code level and discuss. The Philadelphia_ZipCodes shapefile has the MedIncome variable which is the median household income for the year 2000.
+d.	What conclusions can you make based on these findings? That is, can you conclude that farmers markets are clustered in Philly? 
+e.	What might the policy implications of these findings be?
 
 
