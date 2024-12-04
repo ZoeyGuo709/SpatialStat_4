@@ -17,7 +17,7 @@ editor_options:
 ---
 
 
-Version 1.0 | First Created Dec 3, 2024 | Updated Dec , 2024
+Version 2.0 | First Created Dec 2, 2024 | Updated Dec 4, 2024
 
 Keywords: Nearest Neighbor Index (NNI), Ripley's K-Function, Ripley's L-Function, Spatial Clustering
 
@@ -509,20 +509,43 @@ Without conducting the analyses, it is plausible that the absence of farmers mar
 
 #	Discussion
 
-Are the results obtained with the Nearest Neighbor Analysis and K-function Analysis consistent with each other?
+In summary, the findings from both analyses are consistent with each other. Both the Nearest Neighbor Index (NNI) and the K-function suggest that the distribution of farmers' markets in Philadelphia is significantly clustered. The NNI value of 0.7 indicates clustering, and the K-function analysis reveals that the observed clustering is more pronounced at larger distances, with the observed K(r) consistently exceeding the expected K(r) under Complete Spatial Randomness (CSR). These results align with the visual inspection of the farmers' market distribution, which showed areas in the city, especially the northeastern and southern regions, with fewer markets compared to other parts of Philadelphia.
 
-Yes
-
-Are they consistent with your expectations, based on the visual examination of the point data, and given the limitations of each method?
-
-Yes
-
-Does it seem to be the case that areas with lower median incomes have fewer farmers markets? Without doing any statistical tests, present a map of the farmers markets overlaid on a map of median household income at the zip code level and discuss. The Philadelphia_ZipCodes shapefile has the MedIncome variable which is the median household income for the year 2000.
+The results align with our expectations. Visualizing the data indicated that farmers' markets tend to be concentrated in central and western Philadelphia, with fewer markets in the eastern and southern areas. Both the NNI and K-function confirm this pattern, with the clustering being statistically significant. However, it is important to acknowledge the limitations of these methods. The NNI focuses solely on the nearest neighbor distances and does not account for the scale of clustering, while the K-function is more sensitive to clustering over varying distances but requires careful interpretation of the confidence envelopes.
 
 
-What conclusions can you make based on these findings? That is, can you conclude that farmers markets are clustered in Philly? 
+```{r visualize results, message=FALSE, warning=FALSE}
 
+ggplot() +
+  geom_sf(data = zipcode, aes(fill = MedIncome), color = "white") +
+  scale_fill_continuous(low = "#FAF9F6", high = "#197278", name = "Median Income") +
+    geom_sf(data = market, aes(), color = "#c44536", size = 2) +
+    theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    plot.title = element_text(size = 12, face = "bold"),
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "grey", fill = NA, size = 0.4)
+  ) +
+    labs(
+    title = "Farmers Markets and Median Household Income by Zip Code")
 
-What might the policy implications of these findings be?
+```
 
+Visualizing the farmers' markets overlaid on a map of median household income reveals a strong correlation between lower-income areas and fewer farmers' markets. This suggests that markets may be less accessible in neighborhoods with lower median household incomes, likely due to factors such as reduced demand or lack of infrastructure investment in these areas. While this observation is based on a visual assessment and not formal statistical testing, it highlights an important potential inequity in access to healthy food.
 
+That said, we can confidently conclude that farmers' markets in Philadelphia exhibit a clustered spatial pattern. The statistical results from both methods show that the markets are not randomly distributed across the city, but rather concentrated in certain areas, particularly in the central and western parts. This clustering may be driven by factors such as population density, demand for fresh food, and the availability of suitable locations for markets.However, while clustering suggests that some areas have more access to farmers' markets, it also indicates that there are areas, particularly in the northern and southern parts of Philadelphia, that are underserved. This highlights potential gaps in the accessibility of fresh food in these neighborhoods.
+
+The findings suggest several policy recommendations to improve the distribution and accessibility of farmers' markets in Philadelphia. This includes: 
+
+Targeted investment in underserved areas: Policymakers should consider expanding the network of farmers' markets in neighborhoods with lower median incomes and limited access to healthy food. This could be done by providing incentives for market operators to establish locations in underserved neighborhoods or by creating community-led markets in these areas.
+
+Infrastructure development: Areas with fewer farmers' markets may lack the necessary infrastructure to support such markets. Local governments could invest in public spaces or transportation improvements that facilitate access to markets, particularly for those who do not own a car.
+
+Partnerships with local organizations: Collaborating with community organizations to raise awareness about the availability of farmers' markets and offering subsidies or financial assistance to low-income households could help increase market participation in underserved areas.
+
+Enhanced distribution models: To address the needs of residents in more remote or lower-density areas, mobile markets or community-supported agriculture (CSA) programs could be introduced to complement the static markets.
+
+Further research into demand drivers: Future research should explore the specific demand factors influencing the location and success of farmers' markets, such as population density, income levels, and transportation access. This will help inform more targeted and effective policies to address food access issues across the city.
