@@ -229,7 +229,7 @@ philly <- read_sf(here("data", "Philadelphia.shp"))
 
 ```
 
-
+After loading in the data, we made a quick visualization of the farmers' markets in Philadelphia to get a sense of their spatial distribution. Based on visual examinations, we can see that the farmers' markets are not evenly distributed across the city but appear to be clustered in certain areas. Northeastern and southern Philadelphia also appear to have much fewer farmers' markets compared to other regions.
 
 ```{r quickly visualize data, message=FALSE, warning=FALSE}
 
@@ -252,6 +252,7 @@ ggplot() +
 
 ## Nearest Neighbor Analysis
 
+To conduct the nearest neighbor analysis, we first need to prepare the data by extracting the point coordinates of the farmers' markets and converting them into a `ppp` object.
 
 ```{r prepare data for nearest neighbor analysis, message=FALSE, warning=FALSE}
 
@@ -264,7 +265,8 @@ market_pp <- ppp(x = market_coords[,1], y = market_coords[,2], window = philly_w
 
 ```
 
-
+We then calculate the nearest neighbor distances for each point and compare the observed mean distance to the expected mean distance under Complete Spatial Randomness (CSR). The Nearest Neighbor Index (NNI) is calculated as the ratio of the observed mean distance to the expected mean distance, with values less than 1 indicating clustering, values greater than 1 indicating dispersion, and values close to 1 indicating randomness. We also calculate the z-score and p-value to assess the statistical significance of the observed pattern.
+ 
 ```{r nearest neighbor analysis, message=FALSE, warning=FALSE}
 
 # Nearest neighbor analysis
@@ -283,6 +285,7 @@ MeanExpDist <- 0.5 / sqrt(n / area)
 SE <- 0.26136 / sqrt(n*n / area)
 ```
 
+According to the result here, the Nearest Neighbor Index (NNI) is 0.7, which indicates clustering of farmers' markets in Philadelphia. The z-score is -3.6, and the p-value is less than 0.001, suggesting that the observed pattern is significantly clustered.The results suggest that the observed spatial pattern exhibits significant clustering, rejecting the null hypothesis of Complete Spatial Randomness (CSR) at the given confidence level.
 
 ```{r nearest neighbor analysis results, message=FALSE, warning=FALSE}
 
@@ -304,12 +307,15 @@ results %>%
 
 ## K Function Analysis
 
+To conduct the K-function analysis, we first need to prepare the data by computing the maximum Euclidean distance between points in the dataset. Specifically, we would find two points farthest away from one another and divide that distance by two. This determines the extent of distances over which the spatial pattern will be analyzed.
+
 ```{r prepare data for K-function analysis, message=FALSE, warning=FALSE}
 
 # Compute the maximum Euclidean distance between points in the dataset. 
 # This determines the extent of distances over which the spatial pattern will be analyzed.
 
 max.distance <- max(proxy::dist(
+  data.frame(cbind(x = market_coords[,1], y = market_coords[,2])),
   data.frame(cbind(x = market_coords[,1], y = market_coords[,2])),
   method = "euclidean"
 ))
@@ -318,6 +324,7 @@ cat("Maximum Distance:", max.distance, "\n")
 
 ```
 
+The figure plots **Ripley's K-function**, showing the observed \( K(r) \) (solid line) and the theoretical \( K(r) \) under the null hypothesis of Complete Spatial Randomness (CSR) (dashed line). We may see that the observed \( K(r) \) consistently higher than theoretical \( K(r) \) beginning at 54.6875 feet. This suggests that points are more concentrated than expected under CSR. Since the gap between observed and theoretical \( K(r) \) increases with distance, clustering is more pronounced at larger scales. 
 
 ```{r k-function analysis, message=FALSE, warning=FALSE}
 
@@ -325,90 +332,197 @@ cat("Maximum Distance:", max.distance, "\n")
 # This evaluates spatial clustering or dispersion over varying distances.
 
 khat <-Kest(market_pp, rmax=28000, correction="Ripley")
-plot(khat$r,khat$iso,xlab="r", ylab="Ripley's K",
-     main="Ripley's Estimated K-Function",
-     cex.lab=1.6,cex.axis=1.5,cex.main=1.5,lty=1,lwd=2)
-lines(khat$r,khat$theo,lty=8, lwd=2) 
-
-```
-
-```{r}
 khat_df <- data.frame(
   r = khat$r,             # Distance values
   iso = khat$iso,         # Observed K(r) (isotropic)
   theo = khat$theo        # Theoretical K(r)
 )
 
-# Create the ggplot
 ggplot(khat_df, aes(x = r)) +
-  geom_line(aes(y = iso, color = "Observed K(r)"), size = 1) +
-  geom_line(aes(y = theo, color = "Theoretical K(r)"), linetype = "dashed", size = 1) +
+  geom_line(aes(y = iso, color = "Observed K(r)"), size = 2, color = "#197278") +
+  geom_line(aes(y = theo, color = "Theoretical K(r)"), linetype = "dashed", size = 1, color = "#c44536") +
   labs(
     x = "r (Distance)",
     y = "Ripley's K-Function",
     title = "Ripley's Estimated K-Function",
     color = "Legend"
   ) +
-  theme_minimal(base_size = 15) +
-  theme(
-    plot.title = element_text(hjust = 0.5),
-    legend.position = "top"
-  )
+theme_light() +   
+theme(plot.subtitle = element_text(size = 9,face = "italic"),
+        plot.title = element_text(size = 12, face = "bold"), 
+        axis.text.x=element_text(size=6),
+        axis.text.y=element_text(size=6), 
+        axis.title=element_text(size=8))
 
 ```
 
+```{r k-function analysis consistent clustering, warning=FALSE}
+khat_df$difference <- khat_df$iso - khat_df$theo
+threshold_index <- which(khat_df$difference > 0)[1]
 
+if (!is.na(threshold_index)) {
+  consistent_start <- khat_df$r[threshold_index]
+  message("The observed K(r) is consistently higher than the theoretical K(r) starting at r = ", consistent_start)
+} else {
+  message("The observed K(r) does not consistently exceed the theoretical K(r) within the given range.")
+}
+
+```
+
+We also plot the **Ripley's K-function with Confidence Envelopes** to assess the statistical significance of the observed pattern. The confidence envelopes represented the range of values expected under Complete Spatial Randomness (CSR). Since our observed \( K(r) \) consistently exceeds the theoretical \( K(r) \) starting at **54.6875 feet**, we can conclude that the pattern is significantly clustered at distances beyond this threshold.
 
 ```{r k-function analysis confidence envelopes, message=FALSE, warning=FALSE}
 
 # Assess statistical significance by creating confidence envelopes around the observed K-function.
 Kenv <- spatstat.explore::envelope(market_pp,fun="Kest", rmax=28000, nsim=9, nrank=1) 
-plot(Kenv,xlab="r",ylab="Khat(r)", cex.lab=1.6,cex.axis=1.5,main= 
-       "Ripley's Khat with Confidence Envelopes",cex.main=1.5,lwd=2)
+Kenv_df <- data.frame(
+  r = Kenv$r,              # Distance values
+  obs = Kenv$obs,          # Observed K-function
+  lower = Kenv$lo,         # Lower envelope
+  upper = Kenv$hi          # Upper envelope
+)
+
+ggplot(Kenv_df, aes(x = r)) +
+  geom_line(aes(y = obs, color = "Observed K(r)"), size = 2, color = "#772e25") +
+  geom_line(aes(y = lower, color = "Lower Envelope"), linetype = "dashed", size = 1, color = "#197278") +
+  geom_line(aes(y = upper, color = "Upper Envelope"), linetype = "dashed", size = 1, color = "#c44536") +
+  labs(
+    x = "r (Distance)",
+    y = "Khat(r)",
+    title = "Ripley's Khat with Confidence Envelopes",
+    color = "Legend"
+  ) +
+  theme_light() +   
+  theme(plot.subtitle = element_text(size = 9,face = "italic"),
+        plot.title = element_text(size = 12, face = "bold"), 
+        axis.text.x=element_text(size=6),
+        axis.text.y=element_text(size=6), 
+        axis.title=element_text(size=8))
+
 
 ```
 
-```{r k-function analysis adjusted, message=FALSE, warning=FALSE}
+```{r output k-function analysis, warning=FALSE}
+
+Kenv_df$difference_lower <- Kenv_df$obs - Kenv_df$lower
+first_below_index <- which(Kenv_df$difference_lower < 0)[1]
+
+if (!is.na(first_below_index)) {
+  below_start <- Kenv_df$r[first_below_index]
+  message("The observed K(r) falls below the lower envelope starting at r = ", below_start)
+} else {
+  message("The observed K(r) does not fall below the lower envelope within the given range.")
+}
+
+```
+
+We proceed to the **Ripley's L-Function** analysis as it linearizes the K-function for easier interpretation.Below, we see that the observed \( L(r) - r \) values are consistently greater than zero. This indicates that the observed number of points within a distance \( r \) is higher than what is expected under the null hypothesis of Complete Spatial Randomness (CSR). 
+
+Since the magnitude of \( L(r) - r \) reflects the degree of clustering with larger values suggest stronger clustering, the plot here implies that degree of clustering first increased and then decreased as distance increased. This suggests that farmers' markets in Philadelphia are clustered at smaller distances but become more dispersed at larger distances.
+
+```{r L-function analysis, message=FALSE, warning=FALSE}
 
 # Compute and visualize Ripley’s L-function. 
 # This linearizes the K-function for easier interpretation.
 
 lhat <- Lest(market_pp, rmax=28000, correction="Ripley") 
-plot(lhat$r,lhat$iso-lhat$r, xlab="r",ylab="Ripley's L",cex.lab=1.6,  
-     cex.axis=1.5,cex.main=1.5,lty=1,lwd=2, main="Ripley's Estimated L-Function") 
-lines(lhat$r,lhat$theo-lhat$r,lty=8,lwd=2) 
+
+lhat_df <- data.frame(
+  r = lhat$r,                      # Distance values
+  L_obs = lhat$iso - lhat$r,       # Observed L-function minus r
+  L_theo = lhat$theo - lhat$r      # Theoretical L-function minus r
+)
+
+ggplot(lhat_df, aes(x = r)) +
+  geom_line(aes(y = L_obs, color = "Observed L(r)"), size = 2, color = "#197278") +
+  geom_line(aes(y = L_theo, color = "Theoretical L(r)"), linetype = "dashed", size = 1, color = "#c44536") +
+  labs(
+    x = "r (Distance)",
+    y = "Ripley's L - r",
+    title = "Ripley's Estimated L-Function",
+    color = "Legend"
+  ) +
+  theme_light() +   
+  theme(plot.subtitle = element_text(size = 9,face = "italic"),
+        plot.title = element_text(size = 12, face = "bold"), 
+        axis.text.x=element_text(size=6),
+        axis.text.y=element_text(size=6), 
+        axis.title=element_text(size=8))
 
 ```
 
+The final plot shows **Ripley's L-Function with Confidence Envelopes**. The observed \( L(r) - r \) are consistently above the upper confidence envelope (shaded region) across all distances \( r \), indicating that the observed points are more clustered than expected under Complete Spatial Randomness (CSR). 
 
 ```{r k-function analysis adjusted confidence envelopes, message=FALSE, warning=FALSE}
 
 # Create confidence envelopes for the L-function.
 Lenv <- spatstat.explore::envelope(market_pp,fun="Lest", rmax=28000, nsim=9,nrank=1)
-plot(Lenv,xlab="r",ylab="Lhat(r)", cex.lab=1.6,cex.axis=1.5,
-     main= "Ripley's L-function with Confidence Envelopes",cex.main=1.5,lwd=2,legend=F)
+# Adjust observed and envelope values to emphasize deviations from CSR
+L2 <- Lenv
+L2_df <- data.frame(
+  r = L2$r,                   # Distance values
+  obs = L2$obs - L2$r,        # Adjusted observed L-function
+  theo = L2$theo - L2$r,      # Adjusted theoretical L-function
+  lo = L2$lo - L2$r,          # Lower confidence envelope
+  hi = L2$hi - L2$r           # Upper confidence envelope
+)
+
+ggplot(L2_df, aes(x = r)) +
+  geom_ribbon(aes(ymin = lo, ymax = hi), fill = "grey80", alpha = 0.5) +
+  geom_line(aes(y = obs, color = "Observed L(r)"), size = 2, color = "#197278") +
+  geom_line(aes(y = theo, color = "Theoretical L(r)"), linetype = "dashed", size = 1, color = "#c44536") +
+  labs(
+    x = "r (Distance)",
+    y = "L(r) - r",
+    title = "Ripley's L-Function with Confidence Envelopes",
+    color = "Legend"
+  ) +
+  theme_light() +   
+  theme(plot.subtitle = element_text(size = 9,face = "italic"),
+        plot.title = element_text(size = 12, face = "bold"), 
+        axis.text.x=element_text(size=6),
+        axis.text.y=element_text(size=6), 
+        axis.title=element_text(size=8))
 
 ```
 
-```{r better viz, message=FALSE, warning=FALSE}
+```{r population zipcode, message=FALSE, warning=FALSE}
 
-# Adjust the observed and envelope values of the L-function to emphasize deviations from CSR.
-L2 <- Lenv 
-L2$obs <- L2$obs-L2$r
-L2$theo <- L2$theo-L2$r
-L2$lo <- L2$lo-L2$r
-L2$hi <- L2$hi-L2$r
+ggplot() +
+  geom_sf(data = zipcode, aes(fill = Pop2000), color = "white") +
+   scale_fill_continuous(low = "#FAF9F6", high = "#c44536", name= "Population") + 
+  theme(
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        plot.title = element_text(size = 12, face = "bold"),
+        panel.background = element_blank(),
+        panel.border = element_rect(colour = "grey", fill=NA, size=0.4)
+        ) +
+  labs(title = "Philadelphia Population by Zip Code")
 
-plot(L2,xlab="r",ylab="Lhat(r)", cex.lab=1.6,cex.axis=1.5,
-     main= "Ripley's L-function with Confidence Envelopes",cex.main=1.5,lwd=2,legend=F)
+
 ```
+
+Without conducting the analyses, it is plausible that the absence of farmers markets in Northeast Philly and South Philly could be due to low population density in those areas. If the population is sparse, there may be less demand or fewer opportunities for farmers markets to thrive. In this case, a nonhomogeneous K-function would be a valuable tool in this context. Unlike the homogeneous K-function, which assumes a uniform distribution of points across the study area, the inhomogeneous K-function allows for variations in point density, accounting for factors like population density or demand for farmers markets in different areas. Taking population density into account can provide a more accurate assessment of clustering patterns. 
 
 #	Discussion
 
-a.	Are the results obtained with the Nearest Neighbor Analysis and K-function Analysis consistent with each other?
-b.	Are they consistent with your expectations, based on the visual examination of the point data, and given the limitations of each method?
-c.	Does it seem to be the case that areas with lower median incomes have fewer farmers markets? Without doing any statistical tests, present a map of the farmers markets overlaid on a map of median household income at the zip code level and discuss. The Philadelphia_ZipCodes shapefile has the MedIncome variable which is the median household income for the year 2000.
-d.	What conclusions can you make based on these findings? That is, can you conclude that farmers markets are clustered in Philly? 
-e.	What might the policy implications of these findings be?
+Are the results obtained with the Nearest Neighbor Analysis and K-function Analysis consistent with each other?
+
+Yes
+
+Are they consistent with your expectations, based on the visual examination of the point data, and given the limitations of each method?
+
+Yes
+
+Does it seem to be the case that areas with lower median incomes have fewer farmers markets? Without doing any statistical tests, present a map of the farmers markets overlaid on a map of median household income at the zip code level and discuss. The Philadelphia_ZipCodes shapefile has the MedIncome variable which is the median household income for the year 2000.
+
+
+What conclusions can you make based on these findings? That is, can you conclude that farmers markets are clustered in Philly? 
+
+
+What might the policy implications of these findings be?
 
 
